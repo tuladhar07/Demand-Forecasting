@@ -1,10 +1,12 @@
-# Champagne Sales Forecasting: A Learning Journey with ARIMA & SARIMA
+# Champagne Sales Forecasting: A Learning Journey with Time Series Analysis
 
-This repository documents my process of learning time series analysis and demand forecasting. I've used the classic "Perrin Freres Monthly Champagne Sales" dataset to build a forecasting model using ARIMA and Seasonal ARIMA (SARIMA) in Python.
+This repository documents my process of learning time series analysis and demand forecasting. I've used the classic "Perrin Freres Monthly Champagne Sales" dataset to build and compare forecasting models using both traditional statistical methods (ARIMA/SARIMA) and modern machine learning techniques in Python.
 
 ## About This Project
 
-As someone new to data science and forecasting, my primary goal was to get hands-on experience with time series data from start to finish. This project walks through the essential steps of data cleaning, analysis, statistical testing, modeling, and prediction.
+As someone new to data science and forecasting, my primary goal was to get hands-on experience with a complete time series project. This project is structured in two parts:
+1.  **Part 1: The Statistical Approach:** A deep dive into ARIMA and Seasonal ARIMA (SARIMA).
+2.  **Part 2: The Machine Learning Approach:** Applying models like Linear Regression, XGBoost, LightGBM, and Quantile Regression.
 
 The notebook `Champagne_sales_forecast.ipynb` contains all the code and my step-by-step approach.
 
@@ -14,67 +16,86 @@ The dataset contains the monthly sales of champagne for Perrin Freres from 1964 
 *   `Month`: The month of the sales record.
 *   `Sales`: The total sales in millions for that month.
 
-## My Learning Journey & Process
+---
 
-I followed the standard methodology for building an ARIMA-based time series model. Here's a breakdown of my steps:
+## Part 1: My Learning Journey with ARIMA & SARIMA
+
+I started by following the standard methodology for building an ARIMA-based time series model.
 
 ### 1. Data Exploration and Cleaning
-First, I loaded the data using `pandas`. Upon inspecting the `head()` and `tail()` of the DataFrame, I noticed some issues:
-- The column names were messy.
-- There were `NaN` values and an irrelevant description row at the end of the file.
-
-I cleaned the data by renaming the columns to `Month` and `Sales` and dropping the problematic rows. I then converted the `Month` column to a proper `datetime` object and set it as the DataFrame's index, which is crucial for time series analysis.
+I loaded the data using `pandas` and discovered some messy column names and `NaN` values at the end of the file. I cleaned this by renaming the columns, dropping the problematic rows, and converting the `Month` column to a `datetime` object, which I set as the index.
 
 ### 2. Visualizing the Time Series
-I created a simple plot of the sales data over time. The visualization immediately revealed key characteristics:
+A simple plot of the sales data immediately revealed key characteristics:
 - **Upward Trend:** Sales generally increase over the years.
-- **Strong Seasonality:** There is a clear, repeating pattern of peaks and troughs each year, indicating high sales during specific seasons (likely the holidays).
-- **Non-Stationarity:** The combination of trend and seasonality means the statistical properties of the data (like the mean) are not constant over time. This is a critical observation, as ARIMA models require the data to be stationary.
+- **Strong Seasonality:** A clear, repeating pattern of peaks and troughs each year.
+- **Non-Stationarity:** The trend and seasonality mean the data's statistical properties are not constant. This is a critical observation, as ARIMA models require stationary data.
 
 ### 3. Testing for Stationarity
-To statistically confirm my observation from the plot, I used the **Augmented Dickey-Fuller (ADF) Test**. This is a statistical test where the null hypothesis is that the time series is non-stationary.
+To statistically confirm my observation, I used the **Augmented Dickey-Fuller (ADF) Test**. The initial p-value was `0.36`, far above the `0.05` threshold, confirming the data was non-stationary.
 
-The initial p-value was `0.36`, which is much greater than the standard threshold of `0.05`. This confirmed that I had to reject the alternative hypothesis and accept that the data is non-stationary.
-ADF Test Statistic : -1.8335930563276202
-p-value : 0.36391577166024636
-#Lags Used : 11
-Number of Observations Used : 93
-weak evidence against null hypothesis, time series has a unit root, indicating it is non-stationary
-code
-Code
 ### 4. Achieving Stationarity with Differencing
-To make the series stationary, I applied **differencing**. Since the data has a clear yearly seasonality (12 months), I used seasonal differencing (`df['Sales'] - df['Sales'].shift(12)`). This calculates the difference in sales between a month and the same month in the previous year, effectively removing the seasonal pattern and trend.
+To handle the strong yearly seasonality, I applied **seasonal differencing** (subtracting the value from 12 months prior). A second ADF test on the differenced data yielded a p-value of `2.06e-11`, providing strong evidence that the series was now **stationary**.
 
-After differencing, I ran the ADF test again. The new p-value was extremely small (`2.06e-11`), providing strong evidence that the differenced data is now **stationary**.
+### 5. Building the SARIMA Model
+Using the Autocorrelation (ACF) and Partial Autocorrelation (PACF) plots for guidance, I built a **Seasonal ARIMA (SARIMA)** model with parameters `(1,1,1)(1,1,1,12)`. This model proved effective at capturing both the trend and the complex seasonal patterns in the data.
 
-### 5. Identifying Model Parameters (ACF & PACF)
-With a stationary series, the next step was to find the right parameters for my ARIMA model (`p`, `d`, `q`). I plotted the **Autocorrelation Function (ACF)** and **Partial Autocorrelation Function (PACF)**.
-- The **ACF** plot helps determine the `q` parameter (Moving Average lags).
-- The **PACF** plot helps determine the `p` parameter (Autoregressive lags).
+---
 
-These plots showed significant spikes, particularly at lags corresponding to the seasonal period (e.g., lag 12), confirming that a seasonal model was necessary.
+## Part 2: Expanding to Machine Learning Models
 
-### 6. Building the Forecasting Models
-I experimented with two models:
+After building a successful statistical model, I wanted to explore how machine learning models would handle the same forecasting task. This required transforming the time series data into a feature-based format suitable for supervised learning.
 
-1.  **ARIMA(1,1,1):** As a first attempt, I built a simple, non-seasonal ARIMA model. The forecast captured the overall trend but completely missed the crucial seasonal peaks. This was a great learning moment, demonstrating the limitations of a basic model on seasonal data.
+### 1. Feature Engineering
+This was the most important step. I created a set of informative features from the `Month` index and the `Sales` data itself:
+- **Time-based Features:** `month`, `year`, `quarter`.
+- **Lag Features:** Sales from the previous month (`lag_1`) and the same month last year (`lag_12`) to explicitly give the model information about recent trends and seasonality.
+- **Rolling Window Features:** The mean and standard deviation of sales over a 3-month rolling window (`rolling_mean_3`, `rolling_std_3`) to capture short-term dynamics.
 
-2.  **SARIMA(1,1,1)(1,1,1,12):** I then implemented a **Seasonal ARIMA (SARIMA)** model, which accounts for seasonality. The `(1,1,1)` are the non-seasonal parameters (`p,d,q`), and `(1,1,1,12)` are the seasonal parameters (`P,D,Q,m`), where `m=12` is the seasonal period.
+### 2. Train-Test Split
+For a realistic forecast evaluation, I performed a chronological split, training the models on the initial data and testing them on the final 18 months.
 
-This model performed significantly better, as its forecasts closely followed the seasonal patterns in the actual data.
+### 3. Building ML Forecasting Models
+I trained four different regression models:
+- **Linear Regression:** A simple baseline to understand the performance of a basic linear model.
+- **XGBoost & LightGBM:** Powerful gradient boosting models known for their high performance.
+- **Quantile Regression (with LightGBM):** Instead of a single prediction, this advanced technique forecasts a *range* of possible outcomes (e.g., a "worst-case" 10th percentile and a "best-case" 90th percentile). This is incredibly useful for risk management and inventory planning.
 
-### 7. Forecasting the Future
-Finally, I used the trained SARIMA model to forecast champagne sales for the next 24 months beyond the dataset's end date. The resulting forecast continues the upward trend and seasonal patterns observed in the historical data.
+---
+
+## Model Comparison and Conclusion
+
+To determine the best model, I compared them both quantitatively (using Mean Absolute Error) and visually.
+
+### Quantitative Results (MAE)
+
+The Mean Absolute Error (MAE) shows the average forecast error. Lower is better.
+
+| Model             | Mean Absolute Error (MAE) |
+| ----------------- | ------------------------- |
+| **SARIMA**        | **536.31**                |
+| LightGBM          | 623.54                    |
+| XGBoost           | 651.98                    |
+| Linear Regression | 1146.43                   |
+
+### Final Decision
+
+1.  **Overall Best Model for Accuracy:** The **SARIMA** model was the clear winner, achieving the lowest MAE. This shows that for time series with strong, regular seasonality, a purpose-built statistical model can be exceptionally effective.
+
+2.  **Best Model for Business Planning:** The **Quantile Regression** model provided the most business value. By forecasting a prediction interval, it allows for strategic planning around best-case and worst-case sales scenarios, which is crucial for managing inventory and risk.
+
+This project was a fantastic learning experience, demonstrating the strengths of both traditional statistical and modern machine learning approaches to time series forecasting.
 
 ## Key Concepts I Learned
-- **Time Series Components:** Identifying trend, seasonality, and residuals in a dataset.
-- **Stationarity:** Understanding what it is, why it's a prerequisite for ARIMA models, and how to test for it using the ADF test.
-- **Differencing:** A powerful technique to transform a non-stationary series into a stationary one.
-- **ACF/PACF Plots:** How to use these plots to get a hint about the right parameters for an ARIMA model.
-- **ARIMA vs. SARIMA:** The importance of choosing the right model based on the data's characteristics. SARIMA is essential for data with a clear seasonal component.
+- **Time Series Components:** Trend, Seasonality, and Stationarity.
+- **Statistical Modeling:** Using the ADF test, differencing, and ACF/PACF plots to build ARIMA and SARIMA models.
+- **Feature Engineering:** Creating time-based, lag, and rolling window features to prepare data for ML models.
+- **Chronological Train-Test Splits:** The correct validation method for time series data.
+- **Probabilistic Forecasting:** Using Quantile Regression to forecast a range of outcomes for better decision-making.
 
 ## Tools and Libraries
 - **Python**
-- **pandas** for data manipulation.
-- **matplotlib** for plotting.
-- **statsmodels** for time series analysis, including the ADF test, ACF/PACF plots, and ARIMA/SARIMA models.
+- **Pandas** for data manipulation and feature engineering.
+- **Matplotlib** for plotting and visualization.
+- **Statsmodels** for time series analysis (ADF, ARIMA, SARIMA).
+- **Scikit-learn**, **XGBoost**, and **LightGBM** for training machine learning models.
